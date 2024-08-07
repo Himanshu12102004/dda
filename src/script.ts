@@ -11,6 +11,9 @@ let lineForm = { type: 'Two Points' };
 let pointSize = { lineWidth: 1 };
 let points: Array<number> = [];
 let coord: HTMLSpanElement = document.querySelector('.coordinates')!;
+let wantToSeeGridCoords = {
+  gridCoordinates: true,
+};
 let inputs = {
   x1: 0.39,
   y1: 0.27,
@@ -91,13 +94,18 @@ function generateGridVertices() {
   }
   draw();
   updateGUI();
-  let points = makeTheCoordinates();
+  displayCoordinates();
+}
+function displayCoordinates() {
   let myCoords = document.querySelector('.myCoords')!;
   myCoords.innerHTML = '';
-  points.forEach((elem: Points) => {
-    let html = genCoordinateHtml(elem, true);
-    myCoords.insertAdjacentHTML('beforeend', html);
-  });
+  if (wantToSeeGridCoords.gridCoordinates) {
+    let points = makeTheCoordinates();
+    points.forEach((elem: Points) => {
+      let html = genCoordinateHtml(elem, true);
+      myCoords.insertAdjacentHTML('beforeend', html);
+    });
+  }
 }
 async function init() {
   try {
@@ -112,7 +120,9 @@ async function init() {
 
     gui.addColor(gridColor, 'color').name('Grid Color').onChange(drawLine);
     gui.addColor(lineColor, 'color').name('Line Color').onChange(drawLine);
-    gui.add(graphScale, 'scale', 10, 500).onChange(generateGridVertices);
+    gui
+      .add(wantToSeeGridCoords, 'gridCoordinates')
+      .onChange(displayCoordinates);
     gui.add(pointSize, 'lineWidth', 1, 50).onChange(drawLine);
     updateGUI();
     window.addEventListener('mousemove', (e) => {
@@ -222,7 +232,7 @@ function drawLine() {
   let uniformLocation = gl.getUniformLocation(program, 'userColors');
   let pointSizeUniformLocation = gl.getUniformLocation(program, 'pointSize');
   gl.enableVertexAttribArray(vertexLocation);
-  gl.clearColor(0.0, 0.0, 0.0, 1);
+  gl.clearColor(1.0, 1.0, 1.0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   let axesBuffer = createBuffer(new Float32Array(axes), gl);
   gl.bindBuffer(gl.ARRAY_BUFFER, axesBuffer);
@@ -309,6 +319,11 @@ function main() {
     console.log(err.message);
   }
 }
+window.addEventListener('wheel', (e) => {
+  if (e.deltaY > 0) graphScale.scale = graphScale.scale * 0.95;
+  else graphScale.scale = graphScale.scale * 1.05;
+  generateGridVertices();
+});
 window.addEventListener('resize', () => {
   height = innerHeight;
   width = innerWidth;
@@ -322,4 +337,11 @@ window.addEventListener('resize', () => {
       'flex';
   main();
 });
+document.querySelector('.help')!.addEventListener('click', () => {
+  (document.querySelector('.myHelp') as HTMLDivElement).style.display = 'flex';
+});
+document.querySelector('.closeHelp')!.addEventListener('click', () => {
+  (document.querySelector('.myHelp') as HTMLDivElement).style.display = 'none';
+});
+
 init();

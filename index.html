@@ -3,12 +3,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="./favIcon.png" type="image/x-icon" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
     <title>Document</title>
     <style>
+      .help {
+        top: 10px;
+        left: 10px;
+        position: absolute;
+        z-index: 3;
+        display: flex;
+        height: 25px;
+        background-color: black;
+        width: 80px;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-family: monospace;
+        border: white 1px solid;
+      }
+      .help:hover {
+        cursor: pointer;
+      }
       * {
         padding: 0;
         margin: 0;
+      }
+      .myHelp {
+        display: none;
+        top: 0;
+        z-index: 3;
+        position: absolute;
+        height: 100%;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        backdrop-filter: blur(8px);
+        color: white;
+        font-family: monospace;
       }
       .coordinates {
         position: absolute;
@@ -50,14 +83,51 @@
         border: none;
         cursor: pointer;
         line-height: 1.5;
+        text-align: justify;
       }
       .madeBy {
-        right: 0;
+        background-color: black;
+        right: 7px;
         z-index: 3;
-        bottom: 0;
+        bottom: 7px;
         position: absolute;
         color: white;
+        text-decoration: underline;
         font-family: monospace;
+      }
+      .firstSentence {
+        font-size: 16px;
+        max-width: 500px;
+      }
+      .helpHead {
+        align-self: flex-start;
+        font-size: 25px;
+      }
+      .myHelpSub {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        font-size: 16px;
+        padding-top: 0px;
+      }
+      .optionSentence {
+        font-size: 16px;
+      }
+      .closeHelp {
+        font-size: 20px;
+        border: 1px solid white;
+        display: flex;
+        height: 30px;
+        width: 150px;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        cursor: pointer;
       }
     </style>
   </head>
@@ -65,11 +135,50 @@
     <canvas></canvas>
     <span class="coordinates"></span>
     <script type="module" src="./dist/script.js"></script>
-    <div class="myCoords"></div>
     <div class="lineCoords"></div>
     <div class="restricted">
       Browser window too small to view this website,<br />
       please open it on a pc.
+    </div>
+    <div class="help">Help</div>
+    <div class="myCoords"></div>
+    <div class="myHelp">
+      <div class="myHelpSub">
+        <div class="helpHead">Help</div>
+        <div class="firstSentence">
+          This Software has been developed to visualize the DDA (Digital
+          Differential Analyzer) algorithm for drawing a line.
+        </div>
+        <div class="optionSentence">
+          The options on the top right corner are:
+        </div>
+        <div class="list">
+          <div>1) Type: Choose the line equation form.</div>
+          <div>2) Grid Color: Change the grid lines color.</div>
+          <div>3) Line Color: Change the line color.</div>
+          <div>4) Grid Coordinates: Toggle grid coordinates visibility.</div>
+          <div>5) Line Width: Adjust the line width.</div>
+          <div>6) Inputs: Set the parameters for line drawing.</div>
+          <div>
+            7) Zoom: Scroll up/down using your trackpad/mouse <br />
+            wheel to zoom in/out.
+          </div>
+        </div>
+        <div>
+          Facing issue? Mail me at:
+          <a style="color: white" href="mailto:himanshu12102004@gmail.com"
+            >himanshu12102004@gmail.com</a
+          >
+          <br />
+          or raise the issue here
+          <a
+            style="color: white"
+            href="https://github.com/Himanshu12102004/dda/issues"
+            >GitHub</a
+          >
+        </div>
+        <div class="closeHelp">Close Help</div>
+      </div>
     </div>
     <a href="https://www.linkedin.com/in/himanshu-gupta-b24254257/">
       <div class="madeBy">Made with ❤️ by Himanshu</div>
