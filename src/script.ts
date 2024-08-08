@@ -3,16 +3,22 @@ import { shaderCompiler } from './helpers/compileShaders.js';
 import { createBuffer } from './helpers/createBuffer.js';
 import { createProgram } from './helpers/createProgram.js';
 import dat from 'https://cdn.skypack.dev/dat.gui';
-let canvas, gl: WebGL2RenderingContext;
-let graphScale = { scale: 150 };
+let canvas: HTMLCanvasElement, gl: WebGL2RenderingContext;
+let graphScale = { scale: 300 };
 let gridColor = { color: [86, 86, 86] };
 let lineColor = { color: [173, 216, 230] };
-let lineForm = { type: 'Two Points' };
+let lineForm = { 'Line Form': 'Two Points' };
 let pointSize = { lineWidth: 1 };
 let points: Array<number> = [];
 let coord: HTMLSpanElement = document.querySelector('.coordinates')!;
 let wantToSeeGridCoords = {
   gridCoordinates: true,
+};
+let bounds = {
+  maxX: 0,
+  minX: 0,
+  maxY: 0,
+  minY: 0,
 };
 let inputs = {
   x1: 0.39,
@@ -64,13 +70,31 @@ function loadShader(shaderUrl: string): Promise<string> {
   });
 }
 function handleMouseMove(e: MouseEvent) {
+  const element = document.elementFromPoint(e.clientX, e.clientY);
+  if (e.buttons === 1 && element instanceof HTMLCanvasElement) {
+    var iRange = bounds.maxY - bounds.minY;
+    var rRange = bounds.maxX - bounds.minX;
+    var iDelta = (e.movementY / canvas.clientHeight) * iRange;
+    var rDelta = (e.movementX / canvas.clientWidth) * rRange;
+    bounds.minY += iDelta;
+    bounds.maxY += iDelta;
+    bounds.minX -= rDelta;
+    bounds.maxX -= rDelta;
+    generateGridVertices();
+    canvas.style.cursor = 'grabbing';
+  } else {
+    canvas.style.cursor = 'default';
+  }
   let distance = graphScale.scale;
   let rightBound = width / (2 * distance);
   let topBound = height / (2 * distance);
   let leftBound = -rightBound;
   let bottomBound = -topBound;
-  let x = (e.clientX * (rightBound - leftBound)) / width + leftBound;
-  let y = -((e.clientY * (topBound - bottomBound)) / height + bottomBound);
+  let centerX = (bounds.maxX + bounds.minX) / 2;
+  let centerY = (bounds.maxY + bounds.minY) / 2;
+  let x = (e.clientX * (rightBound - leftBound)) / width + leftBound + centerX;
+  let y =
+    -((e.clientY * (topBound - bottomBound)) / height + bottomBound) + centerY;
   coord!.innerHTML = `${x.toFixed(3)} , ${y.toFixed(3)}`;
   coord!.style.top = `${e.clientY - 15}px`;
   coord!.style.left = `${e.clientX + 1}px`;
@@ -78,19 +102,18 @@ function handleMouseMove(e: MouseEvent) {
 function generateGridVertices() {
   axes = [];
   let distance = graphScale.scale;
-  let noOfHorizontalLines = height / (2 * distance);
-  let dy = 1 / noOfHorizontalLines;
-  let y = 0;
-  for (let i = 0; i < noOfHorizontalLines; i++) {
-    axes.push(-1, y, 1, y, -1, -y, 1, -y);
-    y += dy;
+  let leftBoundX = Math.floor(bounds.minX);
+  let rightBoundX = Math.floor(bounds.maxX);
+  let topBoundY = Math.floor(bounds.maxY);
+  let bottomBoundY = Math.floor(bounds.minY);
+
+  for (let i = bottomBoundY; i <= topBoundY; i++) {
+    let y = (2 * (i - bounds.minY)) / (bounds.maxY - bounds.minY) - 1;
+    axes.push(-1, y, 1, y);
   }
-  let noOfVerticalLines = width / (2 * distance);
-  let dx = 1 / noOfVerticalLines;
-  let x = 0;
-  for (let i = 0; i < noOfVerticalLines; i++) {
-    axes.push(x, -1, x, 1, -x, 1, -x, -1);
-    x += dx;
+  for (let i = leftBoundX; i <= rightBoundX; i++) {
+    let x = (2 * (i - bounds.minX)) / (bounds.maxX - bounds.minX) - 1;
+    axes.push(x, -1, x, 1);
   }
   draw();
   updateGUI();
@@ -109,21 +132,31 @@ function displayCoordinates() {
 }
 async function init() {
   try {
+    canvas = document.querySelector('canvas') as HTMLCanvasElement;
+    gl = canvas!.getContext('webgl2')!;
+    bounds.maxX = width / (2 * graphScale.scale) + 0.2;
+    bounds.minX = -bounds.maxX + 0.4;
+    bounds.maxY = height / (2 * graphScale.scale) + 0.2;
+    bounds.minY = -bounds.maxY + 0.4;
     const vertexShaderSource = await loadShader('./shaders/dda.vs.glsl');
     const fragmentShaderSource = await loadShader('./shaders/dda.fs.glsl');
     shaders = [vertexShaderSource, fragmentShaderSource];
     main();
     generateGridVertices();
     gui
-      .add(lineForm, 'type', ['Two Points', 'Point and Theta'])
+      .add(lineForm, 'Line Form', ['Two Points', 'Point and Theta'])
       .onChange(updateGUI);
 
     gui.addColor(gridColor, 'color').name('Grid Color').onChange(drawLine);
     gui.addColor(lineColor, 'color').name('Line Color').onChange(drawLine);
     gui
       .add(wantToSeeGridCoords, 'gridCoordinates')
+      .name('Show Vertices')
       .onChange(displayCoordinates);
-    gui.add(pointSize, 'lineWidth', 1, 50).onChange(drawLine);
+    gui
+      .add(pointSize, 'lineWidth', 1, 50)
+      .name('Line Width')
+      .onChange(drawLine);
     updateGUI();
     window.addEventListener('mousemove', (e) => {
       handleMouseMove(e);
@@ -149,13 +182,10 @@ function genCoordinateHtml(elem: Points, gridCoords: boolean) {
 function renderTheLineEnds(x1: number, y1: number, x2: number, y2: number) {
   let lineCoords = document.querySelector('.lineCoords')!;
   lineCoords.innerHTML = '';
-  let distance = graphScale.scale;
-  let noOfVerticalLines = width / (2 * distance);
-  let noOfHorizontalLines = height / (2 * distance);
-  let [x, y] = getCoord(x1, y1, noOfVerticalLines, noOfHorizontalLines);
+  let [x, y] = getCoord(x1, y1);
   let firstPoint = new Points(x1, y1, x, y);
   let point1Html = genCoordinateHtml(firstPoint, false);
-  [x, y] = getCoord(x2, y2, noOfVerticalLines, noOfHorizontalLines);
+  [x, y] = getCoord(x2, y2);
   let secondPoint = new Points(x2, y2, x, y);
   let point2Html = genCoordinateHtml(secondPoint, false);
   lineCoords.insertAdjacentHTML('beforeend', point1Html);
@@ -163,25 +193,28 @@ function renderTheLineEnds(x1: number, y1: number, x2: number, y2: number) {
 }
 function draw() {
   points = [];
-  if (lineForm.type == 'Two Points') {
+  let centerX = (bounds.maxX + bounds.minX) / 2;
+  let centerY = (bounds.maxY + bounds.minY) / 2;
+  if (lineForm['Line Form'] == 'Two Points') {
     points = ddaGenPoints(
-      inputs.x1 * graphScale.scale,
-      inputs.y1 * graphScale.scale,
-      inputs.x2 * graphScale.scale,
-      inputs.y2 * graphScale.scale,
+      (inputs.x1 - centerX) * graphScale.scale,
+      (inputs.y1 - centerY) * graphScale.scale,
+      (inputs.x2 - centerX) * graphScale.scale,
+      (inputs.y2 - centerY) * graphScale.scale,
       width / 2,
       height / 2
     );
     renderTheLineEnds(inputs.x1, inputs.y1, inputs.x2, inputs.y2);
-  } else if (lineForm.type == 'Point and Theta') {
+  } else if (lineForm['Line Form'] == 'Point and Theta') {
     let theta = (inputs.theta * Math.PI) / 180;
     let x2 = inputs.radius * Math.cos(theta) + inputs.x;
     let y2 = inputs.radius * Math.sin(theta) + inputs.y;
+
     points = ddaGenPoints(
-      inputs.x * graphScale.scale,
-      inputs.y * graphScale.scale,
-      x2 * graphScale.scale,
-      y2 * graphScale.scale,
+      (inputs.x - centerX) * graphScale.scale,
+      (inputs.y - centerY) * graphScale.scale,
+      (x2 - centerX) * graphScale.scale,
+      (y2 - centerY) * graphScale.scale,
       width / 2,
       height / 2
     );
@@ -189,35 +222,23 @@ function draw() {
   }
   drawLine();
 }
-function getCoord(
-  i: number,
-  j: number,
-  noOfVerticalLines: number,
-  noOfHorizontalLines: number
-) {
-  let x = (i + noOfVerticalLines) * graphScale.scale;
-  let y = (noOfHorizontalLines - j) * graphScale.scale;
+function getCoord(i: number, j: number) {
+  let leftBoundX = bounds.minX;
+  let topBoundY = bounds.maxY;
+  let x = (i - leftBoundX) * graphScale.scale;
+  let y = (topBoundY - j) * graphScale.scale;
   return [x, y];
 }
 function makeTheCoordinates() {
-  let distance = graphScale.scale;
-  let noOfVerticalLines = width / (2 * distance);
-  let noOfHorizontalLines = height / (2 * distance);
+  let leftBoundX = Math.floor(bounds.minX);
+  let rightBoundX = Math.floor(bounds.maxX);
+  let topBoundY = Math.floor(bounds.maxY);
+  let bottomBoundY = Math.floor(bounds.minY);
   let points = [];
-  for (let i = 0; i <= noOfVerticalLines; i++) {
-    for (let j = 0; j <= noOfHorizontalLines; j++) {
-      let [x, y] = getCoord(i, j, noOfVerticalLines, noOfHorizontalLines);
+  for (let i = leftBoundX; i <= rightBoundX; i++) {
+    for (let j = bottomBoundY; j <= topBoundY; j++) {
+      let [x, y] = getCoord(i, j);
       let point = new Points(i, j, x, y);
-      points.push(point);
-      if (i == 0 && j == 0) continue;
-      [x, y] = getCoord(-i, j, noOfVerticalLines, noOfHorizontalLines);
-      point = new Points(-i, j, x, y);
-      points.push(point);
-      [x, y] = getCoord(-i, -j, noOfVerticalLines, noOfHorizontalLines);
-      point = new Points(-i, -j, x, y);
-      points.push(point);
-      [x, y] = getCoord(i, -j, noOfVerticalLines, noOfHorizontalLines);
-      point = new Points(i, -j, x, y);
       points.push(point);
     }
   }
@@ -232,7 +253,7 @@ function drawLine() {
   let uniformLocation = gl.getUniformLocation(program, 'userColors');
   let pointSizeUniformLocation = gl.getUniformLocation(program, 'pointSize');
   gl.enableVertexAttribArray(vertexLocation);
-  gl.clearColor(1.0, 1.0, 1.0, 1);
+  gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   let axesBuffer = createBuffer(new Float32Array(axes), gl);
   gl.bindBuffer(gl.ARRAY_BUFFER, axesBuffer);
@@ -261,30 +282,24 @@ function updateGUI() {
     gui.removeFolder(inputFolder);
   }
   let distance = graphScale.scale;
-  let noOfVerticalLines = width / (2 * distance) + 1;
-  let noOfHorizontalLines = height / (2 * distance) + 1;
   inputFolder = gui.addFolder('Inputs');
 
-  if (lineForm.type === 'Two Points') {
+  if (lineForm['Line Form'] === 'Two Points') {
     inputFolder
-      .add(inputs, 'x1', -noOfVerticalLines, noOfVerticalLines, 0.01)
+      .add(inputs, 'x1', bounds.minX, bounds.maxX, 0.01)
       .onChange(draw);
     inputFolder
-      .add(inputs, 'y1', -noOfHorizontalLines, noOfHorizontalLines, 0.01)
+      .add(inputs, 'y1', bounds.minY, bounds.maxY, 0.01)
       .onChange(draw);
     inputFolder
-      .add(inputs, 'x2', -noOfVerticalLines, noOfVerticalLines, 0.01)
+      .add(inputs, 'x2', bounds.minX, bounds.maxX, 0.01)
       .onChange(draw);
     inputFolder
-      .add(inputs, 'y2', -noOfHorizontalLines, noOfHorizontalLines, 0.01)
+      .add(inputs, 'y2', bounds.minY, bounds.maxY, 0.01)
       .onChange(draw);
-  } else if (lineForm.type === 'Point and Theta') {
-    inputFolder
-      .add(inputs, 'x', -noOfVerticalLines, noOfVerticalLines, 0.01)
-      .onChange(draw);
-    inputFolder
-      .add(inputs, 'y', -noOfHorizontalLines, noOfHorizontalLines, 0.01)
-      .onChange(draw);
+  } else if (lineForm['Line Form'] === 'Point and Theta') {
+    inputFolder.add(inputs, 'x', bounds.minX, bounds.maxX, 0.01).onChange(draw);
+    inputFolder.add(inputs, 'y', bounds.minY, bounds.maxY, 0.01).onChange(draw);
     inputFolder.add(inputs, 'theta', 0, 360).onChange(draw);
     inputFolder
       .add(
@@ -292,7 +307,8 @@ function updateGUI() {
         'radius',
         0,
         Math.sqrt(
-          Math.pow(noOfHorizontalLines, 2) + Math.pow(noOfVerticalLines, 2)
+          Math.pow(bounds.maxX - bounds.minX, 2) +
+            Math.pow(bounds.maxY - bounds.maxY, 2)
         ),
         0.01
       )
@@ -305,8 +321,6 @@ function updateGUI() {
 
 function main() {
   try {
-    canvas = document.querySelector('canvas');
-    gl = canvas!.getContext('webgl2')!;
     canvas!.height = height;
     canvas!.width = width;
     if (!gl) {
@@ -322,11 +336,23 @@ function main() {
 window.addEventListener('wheel', (e) => {
   if (e.deltaY > 0) graphScale.scale = graphScale.scale * 0.95;
   else graphScale.scale = graphScale.scale * 1.05;
+  let centerX = (bounds.maxX + bounds.minX) / 2;
+  let centerY = (bounds.maxY + bounds.minY) / 2;
+  bounds.maxX = centerX + width / (2 * graphScale.scale);
+  bounds.minX = centerX - width / (2 * graphScale.scale);
+  bounds.maxY = centerY + height / (2 * graphScale.scale);
+  bounds.minY = centerY - height / (2 * graphScale.scale);
   generateGridVertices();
 });
 window.addEventListener('resize', () => {
   height = innerHeight;
   width = innerWidth;
+  let centerX = (bounds.maxX + bounds.minX) / 2;
+  let centerY = (bounds.maxY + bounds.minY) / 2;
+  bounds.maxX = centerX + width / (2 * graphScale.scale);
+  bounds.minX = centerX - width / (2 * graphScale.scale);
+  bounds.maxY = centerY + height / (2 * graphScale.scale);
+  bounds.minY = centerY - height / (2 * graphScale.scale);
   generateGridVertices();
 
   if (height > 500 && width > 500)
@@ -337,6 +363,7 @@ window.addEventListener('resize', () => {
       'flex';
   main();
 });
+
 document.querySelector('.help')!.addEventListener('click', () => {
   (document.querySelector('.myHelp') as HTMLDivElement).style.display = 'flex';
 });
