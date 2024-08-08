@@ -4,7 +4,7 @@ import { createBuffer } from './helpers/createBuffer.js';
 import { createProgram } from './helpers/createProgram.js';
 import dat from 'https://cdn.skypack.dev/dat.gui';
 let canvas: HTMLCanvasElement, gl: WebGL2RenderingContext;
-let graphScale = { scale: 300 };
+let graphScale = { scale: 150 };
 let gridColor = { color: [86, 86, 86] };
 let lineColor = { color: [173, 216, 230] };
 let lineForm = { 'Line Form': 'Two Points' };
